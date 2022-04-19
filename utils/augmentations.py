@@ -29,8 +29,9 @@ class Albumentations:
                 A.ToGray(p=0.01),
                 A.CLAHE(p=0.01),
                 A.RandomBrightnessContrast(p=0.0),
-                A.RandomGamma(p=0.0),
-                A.ImageCompression(quality_lower=75, p=0.0),
+                A.ColorJitter(brightness=(0.1, 0.5), p=0.5),
+                A.RandomGamma(p=0.01),
+                A.ImageCompression(quality_lower=75, p=0.01),
             ]  # transforms
             self.transform = A.Compose(T, bbox_params=A.BboxParams(format="yolo", label_fields=["class_labels"]))
 
@@ -289,7 +290,7 @@ def image_osd(img):
         "ymd": ("%Y-%m-%d ",),
         "week": ("%a ", "%A "),
         "time": ("%H:%M:%S ",),
-        "color": ((0, 0, 0), (255, 255, 255)),
+        "color": ((0, 0, 0), (255, 255, 255), (255, 255, 255), (255, 255, 255)),  # 75% white
         "font": (cv2.FONT_HERSHEY_SIMPLEX, cv2.FONT_HERSHEY_PLAIN, cv2.FONT_HERSHEY_COMPLEX),
     }
     format = ""
@@ -303,7 +304,7 @@ def image_osd(img):
         random.randint(4, 32),  # y1
     )
     font = random.choice(possible_formats["font"])
-    font_scale = (random.random() + 0.5) / 1.5  # 0.5~1
+    font_scale = random.random() * 0.4 + 0.4  # 0.4~0.8
     text_size, _ = cv2.getTextSize(text, font, font_scale, 1)
     _, text_h = text_size
     return cv2.putText(img, text, (x1, y1 + text_h), font, font_scale, text_color)
