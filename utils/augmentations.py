@@ -6,6 +6,7 @@ Image augmentation functions
 import math
 import random
 
+import time
 import cv2
 import numpy as np
 
@@ -19,7 +20,8 @@ class Albumentations:
         self.transform = None
         try:
             import albumentations as A
-            check_version(A.__version__, '1.0.3', hard=True)  # version requirement
+
+            check_version(A.__version__, "1.0.3", hard=True)  # version requirement
 
             T = [
                 A.Blur(p=0.01),
@@ -28,19 +30,20 @@ class Albumentations:
                 A.CLAHE(p=0.01),
                 A.RandomBrightnessContrast(p=0.0),
                 A.RandomGamma(p=0.0),
-                A.ImageCompression(quality_lower=75, p=0.0)]  # transforms
-            self.transform = A.Compose(T, bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']))
+                A.ImageCompression(quality_lower=75, p=0.0),
+            ]  # transforms
+            self.transform = A.Compose(T, bbox_params=A.BboxParams(format="yolo", label_fields=["class_labels"]))
 
-            LOGGER.info(colorstr('albumentations: ') + ', '.join(f'{x}' for x in self.transform.transforms if x.p))
+            LOGGER.info(colorstr("albumentations: ") + ", ".join(f"{x}" for x in self.transform.transforms if x.p))
         except ImportError:  # package not installed, skip
             pass
         except Exception as e:
-            LOGGER.info(colorstr('albumentations: ') + f'{e}')
+            LOGGER.info(colorstr("albumentations: ") + f"{e}")
 
     def __call__(self, im, labels, p=1.0):
         if self.transform and random.random() < p:
             new = self.transform(image=im, bboxes=labels[:, 1:], class_labels=labels[:, 0])  # transformed
-            im, labels = new['image'], np.array([[c, *b] for c, b in zip(new['class_labels'], new['bboxes'])])
+            im, labels = new["image"], np.array([[c, *b] for c, b in zip(new["class_labels"], new["bboxes"])])
         return im, labels
 
 
@@ -77,7 +80,7 @@ def replicate(im, labels):
     boxes = labels[:, 1:].astype(int)
     x1, y1, x2, y2 = boxes.T
     s = ((x2 - x1) + (y2 - y1)) / 2  # side length (pixels)
-    for i in s.argsort()[:round(s.size * 0.5)]:  # smallest indices
+    for i in s.argsort()[: round(s.size * 0.5)]:  # smallest indices
         x1b, y1b, x2b, y2b = boxes[i]
         bh, bw = y2b - y1b, x2b - x1b
         yc, xc = int(random.uniform(0, h - bh)), int(random.uniform(0, w - bw))  # offset x, y
@@ -121,15 +124,7 @@ def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleF
     return im, ratio, (dw, dh)
 
 
-def random_perspective(im,
-                       targets=(),
-                       segments=(),
-                       degrees=10,
-                       translate=.1,
-                       scale=.1,
-                       shear=10,
-                       perspective=0.0,
-                       border=(0, 0)):
+def random_perspective(im, targets=(), segments=(), degrees=10, translate=0.1, scale=0.1, shear=10, perspective=0.0, border=(0, 0)):
     # torchvision.transforms.RandomAffine(degrees=(-10, 10), translate=(0.1, 0.1), scale=(0.9, 1.1), shear=(-10, 10))
     # targets = [cls, xyxy]
 
@@ -282,3 +277,33 @@ def box_candidates(box1, box2, wh_thr=2, ar_thr=100, area_thr=0.1, eps=1e-16):  
     w2, h2 = box2[2] - box2[0], box2[3] - box2[1]
     ar = np.maximum(w2 / (h2 + eps), h2 / (w2 + eps))  # aspect ratio
     return (w2 > wh_thr) & (h2 > wh_thr) & (w2 * h2 / (w1 * h1 + eps) > area_thr) & (ar < ar_thr)  # candidates
+
+
+def image_osd(img):
+    # random timestamp
+    start = 189273600  # 1976-01-01 00：00：00
+    end = 4133951999  # 1990-12-31 23：59：59
+    t = random.randint(start, end)
+    date_touple = time.localtime(t)
+    possible_formats = {
+        "ymd": ("%Y-%m-%d ",),
+        "week": ("%a ", "%A "),
+        "time": ("%H:%M:%S ",),
+        "color": ((0, 0, 0), (255, 255, 255)),
+        "font": (cv2.FONT_HERSHEY_SIMPLEX, cv2.FONT_HERSHEY_PLAIN, cv2.FONT_HERSHEY_COMPLEX),
+    }
+    format = ""
+    format += random.choice(possible_formats["ymd"])
+    format += random.choice(possible_formats["week"])
+    format += random.choice(possible_formats["time"])
+    text = time.strftime(format, date_touple)
+    text_color = random.choice(possible_formats["color"])
+    x1, y1 = (
+        random.randint(4, 64),  # x1
+        random.randint(4, 32),  # y1
+    )
+    font = random.choice(possible_formats["font"])
+    font_scale = (random.random() + 0.5) / 1.5  # 0.5~1
+    text_size, _ = cv2.getTextSize(text, font, font_scale, 1)
+    _, text_h = text_size
+    return cv2.putText(img, text, (x1, y1 + text_h), font, font_scale, text_color)
